@@ -234,7 +234,7 @@ class LSHAnalysis():
         pass
 
     # key表示获得相似feature的个数
-    def Mainfunc(self,mat_addr,base,result_folder,binary_file):
+    def Mainfunc(self,mat_addr,result_folder,binary_file):
         # base数据的所有binary_func_name
         Total_binary_func = [] # binnary:funcution#
         #  np.set_printoptions(suppress=True, precision=6, threshold=8)
