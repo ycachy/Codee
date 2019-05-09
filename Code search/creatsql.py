@@ -411,7 +411,7 @@ if __name__ == "__main__":
     # DOlsh.Mainfunc(folder+mat_file,base,folder+select_result_folder)
 
     # 创建数据库
-    create database YJ_TEST;
+    # create database YJ_TEST;
     # 查询某条记录
     # sql = "select * from test_new where function_name = 'fts3EvalStartReaders'"
     # 查询记录数
@@ -425,7 +425,7 @@ if __name__ == "__main__":
     # DODB.DropTB(DB_INFO['TB'])
 
     # 数据分析并保存数据库
-    DOAnalysis.MainAnalysis(folder+binary_file,folder+mat_file,folder)
+    # DOAnalysis.MainAnalysis(folder+binary_file,folder+mat_file,folder)
 
     # 根据feature查询数据库
     # DOAnalysis.ResultAnalysis(folder+result_file,folder+select_result_file)
