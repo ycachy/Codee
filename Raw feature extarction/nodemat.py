@@ -37,7 +37,9 @@ for file in files:
                 #tempconnectnode = line.strip('\n').strip('}').strip(']').split(',')
                 #print(tempconnectnode)
                 tempconnectnode_len=len(dict['v'])
-                aaa=dict['v'][2:int(tempconnectnode_len)]
+                aaa=[0]*6
+                aaa[0]=len(dict['v'][1])
+                aaa[1:6]=dict['v'][3:int(tempconnectnode_len)]
                 aaalen=len(aaa)
                # print aaa
                 if tempconnectnode_len>1:
@@ -50,11 +52,11 @@ for file in files:
                     bbblen=len(bbb)
                     #####print network[i][7]
                     ######print bbblen
-                    if bbblen<=54:
+                    if bbblen<=60:
                         for jj in range(bbblen):
                             network[ii][int(jj+6)] = int(bbb[int(jj)])
                     else:
-                        for jj in range(54):
+                        for jj in range(60):
                             network[ii][int(jj + 6)] = int(bbb[int(jj)])
                 ii=ii+1
 
