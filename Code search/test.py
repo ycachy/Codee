@@ -226,7 +226,7 @@ class LSHAnalysis():
         SelectDB = Date_Analysis()
         #  np.set_printoptions(suppress=True, precision=6, threshold=8)
         s = sio.loadmat(mat_addr)
-        svec = s['X']
+        svec = s['FFE']
         datalen = len(svec)
         n1, n2, n3 = np.shape(svec)
         #test_dict = {'core':[0,12],'curl':[48,60],'libgmp':[60,72],'busybox':[72,84],'openssl':[84,96],'sqlite':[96,108]}
@@ -396,7 +396,7 @@ class LSHAnalysis():
         ##############################################################################
 
 
-        timee = open(result_folder + 'coreutils_time.txt', 'a')
+        timee = open(result_folder + 'time.txt', 'a')
         target_list = []
         M_list = []
 
