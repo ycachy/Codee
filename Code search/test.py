@@ -8,10 +8,14 @@ import os
 from lshash import LSHash
 DB_INFO = {'host':'127.0.0.1','port':3306,'DB':'YJ_TEST','TB':'test_new'}
 folder = 'F:/Study/510/DocYJ/DataBase/'
-mat_file = 'tensor.mat'
+mat_file = 'tensor_new.mat'
 binary_file = 'functionname/binaryname_new.txt'
-result_file = 'result.txt'
-select_result_folder = 'result/'
+result_file = 'resultnew.txt'
+select_result_folder = 'resultsnew/'
+global result_save
+global model_func_list
+global Base_cg_list
+global model
 
 # 数据库操作类
 class DB_Actor():
@@ -19,7 +23,7 @@ class DB_Actor():
     def __init__(self):
         global DB_INFO
         self.conn = pymysql.Connect(host=DB_INFO['host'], port=DB_INFO['port'],\
-                               user='root', passwd='yangjia', db=DB_INFO['DB'], charset='utf8')
+                               user='root', passwd='jiang', db=DB_INFO['DB'], charset='utf8')
         self.cursor = self.conn.cursor()
         self.CreateTB(DB_INFO['TB'])
 
@@ -69,7 +73,7 @@ class DB_Actor():
         self.cursor.close()
         self.conn.close()
 
-# 数据分析与保存类
+# 数据分析与保存类op
 class Date_Analysis():
     # 初始化数据精度，生成数据库实例
     def __init__(self):
@@ -160,12 +164,19 @@ class Date_Analysis():
 
 
 
-    # 根据feature查询数据库
-    def DatafromFeature(self,feature):
-        sql = "select * from " + self.table + " where feature='" + feature + "'"
+    # 根据feature查询数据库 从0开始,num表示查询数量 注意limit是返回查询结果中的指定行数
+    def DatafromFeature(self,feature,sta,num):
+        res = []
+        sql = "select * from " + self.table + " LIMIT " + str(sta) + ',' + str(num)
         self.DOSQL.cursor.execute(sql)
         rows = self.DOSQL.cursor.fetchall()
-        return rows
+        for row in rows:
+            # print(row)
+            if row[2] == feature:
+                res.append(row)
+            else:
+                pass
+        return res
 
     # 字符串list转浮点数array
     def ListStr2ArrayFloat(self,data):
@@ -202,7 +213,7 @@ class Date_Analysis():
     # 读取.mat文件
     def GetSourceMat(self,Mat_addr):
         m = sio.loadmat(Mat_addr)
-        return m['X']
+        return m['FFE']
 
     # 保存数据库
     def SaveData(self,binary_name,fun_name,feature):
@@ -217,10 +228,110 @@ class Date_Analysis():
 class LSHAnalysis():
     def __init__(self):
         self.DODB = DB_Actor()
+        self.table = DB_INFO['TB']
+        self.SelectDB = Date_Analysis()
+        self.limit = 0.05
         pass
+
+
+    # 获取前key个最近的feature 在limit误差范围内从base_cg中选择一个替换最后一个feature
+    # 不返回下标，直接返回所有bianry:func结果
+    def searchnew(self,test,key,limit,query):
+        global result_save
+        global model_func_list
+        global Base_cg_list
+        global model
+        # testindex=list()
+        base_cg = Base_cg_list[query]
+
+        totaly = []
+        cg_flag = 0
+        last_min_dis = 100.0
+        last_min_binary_fuc = ''
+        last_min_position = 0
+
+        need_key = key - len(result_save)
+
+        #for testi in range(len(test)):
+            #print
+        #test[testi]
+        testindex = list()
+
+        print('len_model:',len(model))
+        print('len_func_list:',len(model_func_list))
+        print('len_result_save:',len(result_save))
+        print('len_cg_binary:',len(base_cg))
+        #y = []
+        for modeli in range(len(model)):
+            dis = np.linalg.norm(np.array(test) - np.array(model[modeli]))
+            testindex.append({'index': modeli, 'dis': dis})
+            #i = i + 1
+        testindex.sort(key=lambda x: x['dis'], reverse=False)
+
+        for x in testindex[0:need_key]:
+            totaly.append(x['index'])
+            result_save.append(model_func_list[x['index']])
+        print('total_index:',totaly)
+
+        #print(totaly)
+        last_feature = model[totaly[need_key-1]]
+        for cg in base_cg:
+            feature_str = cg['feature']
+            feature_str = feature_str.replace('e-','#')
+            feature_list = feature_str.split('-')
+            feature_float = self.liststr2float(feature_list)
+            last_dis = np.linalg.norm(np.array(last_feature) - np.array(feature_float))
+            if last_dis < last_min_dis and last_dis > 0.0:
+                last_min_dis = last_dis
+                last_min_binary_fuc = cg['binary']
+                last_min_position = base_cg.index(cg)
+        #print('last_min_dis:',last_min_dis)
+        if last_min_dis <= limit and last_min_dis > 0.0:
+            print('change:',result_save[key-1],'to',last_min_binary_fuc,last_min_dis,'\n')
+            result_save[key-1] = last_min_binary_fuc
+            del Base_cg_list[query][last_min_position]
+            self.DelUsedData(totaly[0:-1])
+            cg_flag = 1
+        if not cg_flag:
+            print('not change:',result_save[key-1],last_min_dis,'\n')
+            self.DelUsedData(totaly)
+        return result_save
+
+    def DelUsedData(self,indexlist):
+        global model_func_list
+        global model
+        pos = 0
+        for del_index in range(len(indexlist)):
+            del_num = indexlist[del_index]
+            try:
+                del model_func_list[del_num]
+                model = np.delete(model, del_num, axis=0)
+                pos = pos + 1
+                for after_index in range(pos,len(indexlist)):
+                    if indexlist[after_index] > del_num:
+                        indexlist[after_index] = indexlist[after_index] - 1
+                    else:
+                        pass
+                print('Success del_num:',del_num,'indexlist:',indexlist,'len(model_func_list):',len(model_func_list))
+            except Exception as e:
+                print(e)
+                print('Error del_num:',del_num,'indexlist:',indexlist,'len(model_func_list):',len(model_func_list))
+
+
+    def liststr2float(self,data):
+        res = []
+        for num in data:
+            if num.find('#') != -1:
+                num = num.replace('#','e-')
+            res.append(float(num))
+        return res
 
     # key表示获得相似feature的个数
     def Mainfunc(self,mat_addr,base,result_folder):
+        global result_save
+        global model_func_list
+        global Base_cg_list
+        global model
         # base数据的所有binary_func_name
         Total_binary_func = [] # binnary:funcution#
         SelectDB = Date_Analysis()
@@ -232,156 +343,184 @@ class LSHAnalysis():
         #test_dict = {'core':[0,12],'curl':[48,60],'libgmp':[60,72],'busybox':[72,84],'openssl':[84,96],'sqlite':[96,108]}
         test_dict = {'busybox': [0, 12], 'core': [12, 60], 'curl': [60, 72], 'libgmp': [72, 84], 'openssl': [84, 96],
                      'sqlite': [96, 108]}
-        compareDict = {'core_arm_o0':4,'core_arm_o1':5,'core_arm_o2':6,'core_arm_o3':7,
-                       'curl_arm_o0':52,'curl_arm_o1':53,'curl_arm_o2':54,'curl_arm_o3':55,
-                       'libgmp.so.10.3.2_arm_O0':64,'libgmp.so.10.3.2_arm_O1':65,
-                       'libgmp.so.10.3.2_arm_O2':66,'libgmp.so.10.3.2_arm_O3':67,
-                       'busybox_arm_o0':73,'busybox_arm_o1':74,'busybox_arm_o2':75,'busybox_arm_o3':76,
+        # 对应与tensor_new
+
+        compareDict = {'core_dir_arm_o0':16,'core_dir_arm_o1':17,'core_dir_arm_o2':18,'core_dir_arm_o3':19,
+                       'curl_arm_o0':64,'curl_arm_o1':65,'curl_arm_o2':66,'curl_arm_o3':67,
+                       'curl_mips_o0': 68, 'curl_mips_o1': 69, 'curl_mips_o2': 70, 'curl_mips_o3': 71,
+                       'curl_x86_o0': 60, 'curl_x86_o1': 61, 'curl_x86_o2': 62, 'curl_x86_o3': 63,
+                       'libgmp.so.10.3.2_arm_O0':76,'libgmp.so.10.3.2_arm_O1':77,
+                       'libgmp.so.10.3.2_arm_O2':78,'libgmp.so.10.3.2_arm_O3':79,
+                       'libgmp.so.10.3.2_X86_O0': 72, 'libgmp.so.10.3.2_X86_O1': 73,
+                       'libgmp.so.10.3.2_X86_O2': 74, 'libgmp.so.10.3.2_X86_O3': 75,
+                       'libgmp.so.10.3.2_mips_O0': 80, 'libgmp.so.10.3.2_mips_O1': 81,
+                       'libgmp.so.10.3.2_mips_O2': 82, 'libgmp.so.10.3.2_mips_O3': 84,
+                       'busybox_arm_o0':0,'busybox_arm_o1':1,'busybox_arm_o2':2,'busybox_arm_o3':3,
+                       'busybox_mips_o0': 4, 'busybox_mips_o1': 5, 'busybox_mips_o2': 6, 'busybox_mips_o3': 7,
+                       'busybox_x86_o0': 8, 'busybox_x86_o1': 9, 'busybox_x86_o2': 10, 'busybox_x86_o3': 11,
                        'openssl_arm_o0':84, 'openssl_arm_o1':85,'openssl_arm_o2':86,'openssl_arm_o3':87,
                        'sqlite_arm_o0':96,'sqlite_arm_o1':97, 'sqlite_arm_o2':98,'sqlite_arm_o3':99,
+                       'sqlite_x86_o0': 104, 'sqlite_x86_o1': 105, 'sqlite_x86_o2': 106, 'sqlite_x86_o3': 107,
+                       'sqlite_mips_o0': 100, 'sqlite_mips_o1': 101, 'sqlite_mips_o2': 102, 'sqlite_mips_o3': 103,
+                       'core_dir_mips_o0': 20, 'core_dir_mips_o1': 21, 'core_dir_mips_o2': 22, 'core_dir_mips_o3': 23,
+                       'core_dir_x86_o0': 12, 'core_dir_x86_o1': 13, 'core_dir_x86_o2': 14, 'core_dir_x86_o3': 15,
+                       'openssl_mips_o0': 88, 'openssl_mips_o1': 89, 'openssl_mips_o2': 90, 'openssl_mips_o3': 91,
+                       'openssl_x86_o0': 92, 'openssl_x86_o1': 93, 'openssl_x86_o2': 94, 'openssl_x86_o3': 95,
+                       }
 
-        'core_x86_o0': 0, 'core_x86_o1': 1, 'core_x86_o2': 2, 'core_x86_o3': 3,
-        'curl_x86_o0': 48, 'curl_x86_o1': 49, 'curl_x86_o2': 50, 'curl_x86_o3': 51,
-        'libgmp.so.10.3.2_x86_O0': 60, 'libgmp.so.10.3.2_x86_O1': 61,
-        'libgmp.so.10.3.2_x86_O2': 62, 'libgmp.so.10.3.2_x86_O3': 63,
-        'busybox_x86_o0': 80, 'busybox_x86_o1': 81, 'busybox_x86_o2': 82, 'busybox_x86_o3': 83,
-        'openssl_x86_o0': 92, 'openssl_x86_o1': 93, 'openssl_x86_o2': 94, 'openssl_x86_o3': 95,
-        'sqlite_x86_o0': 104, 'sqlite_x86_o1': 105, 'sqlite_x86_o2': 106, 'sqlite_x86_o3': 107,}
-#         FUNCTIONNUMBER={'coreutils_dir_X86_O0':290,'coreutils_dir_X86_O1':239,
-#                         'coreutils_dir_X86_O2':291,'coreutils_dir_X86_O3':255,
-#                         'coreutils_dir_arm_O0':451,'coreutils_dir_arm_O1':368,'coreutils_dir_arm_O3':334,'coreutilsr_mips_O0':306,
-#                         'coreutils_dir_mips_O1':247,'coreutils_dir_mips_O2':242,'coreutils_dir_mips_O3':244,'coreutils_du_X86_O0':237,'coreutils_du_X86_O1':182,
-# 'coreutils_du_X86_O2':211,'coreutils_du_X86_O3':176,'coreutils_du_arm_O0':529,'coreutils_du_arm_O1':393,
-# 'coreutils_du_arm_O2':387,
-# 'coreutils_du_arm_O3':329,
-# 'coreutils_du_mips_O0':401,
-# 'coreutils_du_mips_O1':288,
-# 'coreutils_du_mips_O2':273,
-# 'coreutils_du_mips_O3':248,
-# 'coreutils_ls_X86_O0':290,
-# 'coreutils_ls_X86_O1':239,
-# 'coreutils_ls_X86_O2':291,
-# 'coreutils_ls_X86_O3':255,
-# 'coreutils_ls_arm_O0':451,
-# 'coreutils_ls_arm_O1':368,
-# 'coreutils_ls_arm_O2':377,
-# 'coreutils_ls_arm_O3':334,
-# 'coreutils_ls_mips_O0':306,
-# 'coreutils_ls_mips_O1':247,
-# 'coreutils_ls_mips_O2':242,
-# 'coreutils_ls_mips_O3':244,
-# 'coreutils_vdir_X86_O0':290,
-# 'coreutils_vdir_X86_O1':239,
-# 'coreutils_vdir_X86_O2':291,
-# 'coreutils_vdir_X86_O3':255,
-# 'coreutils_vdir_arm_O0':451,
-# 'coreutils_vdir_arm_O1':368,
-# 'coreutils_vdir_arm_O2':377,
-# 'coreutils_vdir_arm_O3':334,
-# 'coreutils_vdir_mips_O0':306,
-# 'coreutils_vdir_mips_O1':247,
-# 'coreutils_vdir_mips_O2':242,
-# 'coreutils_vdir_mips_O3':244,
-# 'curl_X86_O0':128,
-# 'curl_X86_O1':102,
-# 'curl_X86_O2':152,
-# 'curl_X86_O3':134,
-# 'curl_arm_O0':263,
-# 'curl_arm_O1':223,
-# 'curl_arm_O2':213,
-# 'curl_arm_O3':209,
-# 'curl_mips_O0':130,
-# 'curl_mips_O1':107,
-# 'curl_mips_O2':169,
-# 'curl_mips_O3':186,
-# 'libgmp.so.10.3.2_X86_O0': 621,
-# 'libgmp.so.10.3.2_X86__O1': 568,
-# 'libgmp.so.10.3.2_X86__O2': 591,
-# 'libgmp.so.10.3.2_X86__O3': 571,
-# 'libgmp.so.10.3.2_arm_O0':971,
-# 'libgmp.so.10.3.2_arm_O1':876,
-# 'libgmp.so.10.3.2_arm_O2':854,
-# 'libgmp.so.10.3.2_arm_O3':844,
-# 'libgmp.so.10.3.2_mips_O0':606,
-# 'libgmp.so.10.3.2_mips_O1':551,
-# 'libgmp.so.10.3.2_mips_O2':545,
-# 'libgmp.so.10.3.2_mipsO3':544,
-# 'busybox_arm_o0':3216,
-# 'busybox_arm_o1':2128,
-# 'busybox_arm_o2':2099,
-# 'busybox_arm_o3':1730,
-# 'busybox_mips_o0':2900,
-# 'busybox_mips_o1':2243,
-# 'busybox_mips_o2':1726,
-# 'busybox_mips_o3':1381,
-# 'busybox_x86_o0':3196,
-# 'busybox_x86_o1':2390,
-# 'busybox_x86_o2':2542,
-# 'busybox_x86_o3':2045,
-# 'openssl_arm_o0':1778,
-# 'openssl_arm_o1':1692,
-# 'openssl_arm_o2':1675,
-# 'openssl_arm_o3':1658,
-# 'openssl_mips_o0':414,
-# 'openssl_mips_o1':333,
-# 'openssl_mips_o2':333,
-# 'openssl_mips_o3':324,
-# 'openssl_x86_o0':414,
-# 'openssl_x86_o1':322,
-# 'openssl_x86_o2':350,
-# 'openssl_x86_o3':333,
-# 'sqlite_arm_o0':2876,
-# 'sqlite_arm_o1':2058,
-# 'sqlite_arm_o2':1972,
-# 'sqlite_arm_o3':1805,
-# 'sqlite_mips_o0':2701,
-# 'sqlite_mips_o1':1936,
-# 'sqlite_mips_o2':1830,
-# 'sqlite_mips_o3':1705,
-# 'sqlite_x86_o0':2693,
-# 'sqlite_x86_o1':1931,
-# 'sqlite_x86_o2':1967,
-# 'sqlite_x86_o3':1772,
-#                         }
+        FUNCTIONNUMBER={'coreutils_dir_X86_O0':290,
+                        'coreutils_dir_X86_O1':239,
+                        'coreutils_dir_X86_O2':291,
+                        'coreutils_dir_X86_O3':255,
+                        'coreutils_dir_arm_O0':451,
+                        'coreutils_dir_arm_O1':368,
+                        'coreutils_dir_arm_O2':377,
+                        'coreutils_dir_arm_O3':334,
+                        'coreutils_dir_mips_O0':306,
+                        'coreutils_dir_mips_O1':247,
+                        'coreutils_dir_mips_O2':242,
+                        'coreutils_dir_mips_O3':244,
+                        'coreutils_du_X86_O0':237,
+                        'coreutils_du_X86_O1':182,
+                        'coreutils_du_X86_O2':211,
+                        'coreutils_du_X86_O3':176,
+                        'coreutils_du_arm_O0':529,
+                        'coreutils_du_arm_O1':393,
+                        'coreutils_du_arm_O2':387,
+                        'coreutils_du_arm_O3':329,
+                        'coreutils_du_mips_O0':401,
+                        'coreutils_du_mips_O1':288,
+                        'coreutils_du_mips_O2':273,
+                        'coreutils_du_mips_O3':248,
+                        'coreutils_ls_X86_O0':290,
+                        'coreutils_ls_X86_O1':239,
+                        'coreutils_ls_X86_O2':291,
+                        'coreutils_ls_X86_O3':255,
+                        'coreutils_ls_arm_O0':451,
+                        'coreutils_ls_arm_O1':368,
+                        'coreutils_ls_arm_O2':377,
+                        'coreutils_ls_arm_O3':334,
+                        'coreutils_ls_mips_O0':306,
+                        'coreutils_ls_mips_O1':247,
+                        'coreutils_ls_mips_O2':242,
+                        'coreutils_ls_mips_O3':244,
+                        'coreutils_vdir_X86_O0':290,
+                        'coreutils_vdir_X86_O1':239,
+                        'coreutils_vdir_X86_O2':291,
+                        'coreutils_vdir_X86_O3':255,
+                        'coreutils_vdir_arm_O0':451,
+                        'coreutils_vdir_arm_O1':368,
+                        'coreutils_vdir_arm_O2':377,
+                        'coreutils_vdir_arm_O3':334,
+                        'coreutils_vdir_mips_O0':306,
+                        'coreutils_vdir_mips_O1':247,
+                        'coreutils_vdir_mips_O2':242,
+                        'coreutils_vdir_mips_O3':244,
+                        'curl_X86_O0':128,
+                        'curl_X86_O1':102,
+                        'curl_X86_O2':152,
+                        'curl_X86_O3':134,
+                        'curl_arm_O0':263,
+                        'curl_arm_O1':223,
+                        'curl_arm_O2':213,
+                        'curl_arm_O3':209,
+                        'curl_mips_O0':130,
+                        'curl_mips_O1':107,
+                        'curl_mips_O2':169,
+                        'curl_mips_O3':186,
+                        'libgmp.so.10.3.2_X86_O0': 621,
+                        'libgmp.so.10.3.2_X86_O1': 568,
+                        'libgmp.so.10.3.2_X86_O2': 591,
+                        'libgmp.so.10.3.2_X86_O3': 571,
+                        'libgmp.so.10.3.2_arm_O0':971,
+                        'libgmp.so.10.3.2_arm_O1':876,
+                        'libgmp.so.10.3.2_arm_O2':854,
+                        'libgmp.so.10.3.2_arm_O3':844,
+                        'libgmp.so.10.3.2_mips_O0':606,
+                        'libgmp.so.10.3.2_mips_O1':551,
+                        'libgmp.so.10.3.2_mips_O2':545,
+                        'libgmp.so.10.3.2_mips_O3':544,
+                        'busybox_arm_o0':3216,
+                        'busybox_arm_o1':2128,
+                        'busybox_arm_o2':2099,
+                        'busybox_arm_o3':1730,
+                        'busybox_mips_o0':2900,
+                        'busybox_mips_o1':2243,
+                        'busybox_mips_o2':1726,
+                        'busybox_mips_o3':1381,
+                        'busybox_x86_o0':3196,
+                        'busybox_x86_o1':2390,
+                        'busybox_x86_o2':2542,
+                        'busybox_x86_o3':2045,
+                        'openssl_arm_o0':1778,
+                        'openssl_arm_o1':1692,
+                        'openssl_arm_o2':1675,
+                        'openssl_arm_o3':1658,
+                        'openssl_mips_o0':414,
+                        'openssl_mips_o1':333,
+                        'openssl_mips_o2':333,
+                        'openssl_mips_o3':324,
+                        'openssl_x86_o0':414,
+                        'openssl_x86_o1':322,
+                        'openssl_x86_o2':350,
+                        'openssl_x86_o3':333,
+                        'sqlite_arm_o0':2876,
+                        'sqlite_arm_o1':2058,
+                        'sqlite_arm_o2':1972,
+                        'sqlite_arm_o3':1805,
+                        'sqlite_mips_o0':2701,
+                        'sqlite_mips_o1':1936,
+                        'sqlite_mips_o2':1830,
+                        'sqlite_mips_o3':1705,
+                        'sqlite_x86_o0':2693,
+                        'sqlite_x86_o1':1931,
+                        'sqlite_x86_o2':1967,
+                        'sqlite_x86_o3':1772,
+                                                }
+
+        FUNCTIONNAME = []
+        func_name = open(binary_file,'r')
+        func_contents = func_name.readlines()
+        for func_content in func_contents:
+            FUNCTIONNAME.append(func_content.strip("'").strip('\n').split("'")[0])
+        print(FUNCTIONNAME)
+
 
 
         data = np.zeros((n1, 30000))
         test=np.zeros((n1,3500))
         m = 0
-        imodel=compareDict['core_arm_o0']
-        itest=compareDict['core_arm_o3']
-        for i in range(test_dict['core'][0],test_dict['core'][1]):
+
+        #curl在binary_new.txt中最开始的binary
+        Test_BIN_name = 'openssl_arm_o0'
+        #curl在binary_new.txt中下一类最开始的binary
+        Test_END_name = 'sqlite_arm_o0'
+        # 开始位置
+        Test_s = self.GetSqlStart(FUNCTIONNUMBER,FUNCTIONNAME,Test_BIN_name)
+        # 结束位置
+        Test_n = self.GetSqlStart(FUNCTIONNUMBER,FUNCTIONNAME,Test_END_name)
+        # 确定数据库范围
+        Test_s_n = [Test_s,Test_n-Test_s]
+        print(Test_s_n)
+
+
+        for i in range(test_dict['openssl'][0],test_dict['openssl'][1]):
             for j in range(n3):
                 if svec[:, i, j].all() != 0:
                     data[:, m] = svec[:, i, j]
                     m = m + 1
 
         dataves = np.transpose(data)
-
-
-        #testves = np.transpose(test)
-
-
-######## 两对比  两
-        # for j in range(n3):
-        #     if svec[:, imodel, j].all() != 0:
-        #         data[:, m] = svec[:, imodel, j]
-        #         m = m + 1
-        #     if svec[:, itest, j].all() != 0:
-        #         test[:, mm] = svec[:, itest, j]
-        #         mm = mm + 1
-        #dataves = np.transpose(data)
-        #testves=np.transpose(test)
-        # modelindex = list(set(np.random.randint(0, m, size=10000)))
-
-    #    output_total = open(result_folder + 'result_total.txt', 'w')
-
-
         lsh_model = LSHash(7, n1)
+        model = np.zeros((m, n1))
+
 
         for jj in range(m):
         # for jj in range(87212):
             lsh_model.index(dataves[jj, :])
+            model[jj, :] = dataves[jj, :]
+
+        model_back = model.copy() # 保存model
 
 
 
@@ -396,35 +535,52 @@ class LSHAnalysis():
         ##############################################################################
 
 
-        timee = open(result_folder + 'time.txt', 'a')
-        target_list = []
+        timee = open(result_folder + 'openssl_time.txt', 'a')
+        target_list = [] #待测试的feature列表
         M_list = []
+        Base_cg_list = []
+        result_save = []# 逐步保存不同key的值
 
         for queryi in range(len(testindex)):
             target = test[queryi, :]
             temp_target = SelectDB.DataAccuray(target)
             str_target = temp_target.astype(str)
             feature_target = "-".join(str_target)
-            rows = SelectDB.DatafromFeature(feature_target)
+            print(feature_target)
+            rows = SelectDB.DatafromFeature(feature_target,Test_s_n[0],Test_s_n[1])
             target_data = self.Row2Str(rows)
             target_list.append(target_data)
-
-
-            Global_M = self.GetGlobalM(rows[0][1])
+            GetData = self.GetGlobalM(rows[0][1],Test_s_n[0],Test_s_n[1],target_data)
+            Global_M = GetData[0]
+            Base_cg = GetData[1]
             M_list.append(Global_M)
+            Base_cg_list.append(Base_cg)
+        print('Global_M Base_cg_list get success\n')
+        #print('M_list:',M_list)
+        #print('Base_cg_list:',Base_cg_list)
 
-
-        print('Global_M get success\n')
+        #model_func_list = ['test']*len(model)
+        model_func_list = self.GetFuncListFromFeature(model, Test_s_n[0],Test_s_n[1])
+        model_func_list_back = model_func_list.copy()
+        print('target_list get success\n')
 
 
         Totaltime = 0.0
+        Feature_Func_Cache = dict()
+        # 记录feature与func的对应关系，避免重复查数据库feature:func
         # SelectDB = Date_Analysis()
         for queryi in range(len(testindex)):
             flag_over = 0
-            keylist = [i for i in range(1, 10001, 5)]
+            result_save = []
+            model_func_list = model_func_list_back.copy()
+            model = model_back.copy()
+
+
+            keylist = [i for i in range(5, 2001, 5)]
+            #keylist = [i for i in range(5, 21, 5)]
             #keylist=[5]
             target_data = target_list[queryi].split('#')[0]
-            output = open(result_folder + 'coreutils_result_base' + str(base) + \
+            output = open(result_folder + 'openssl_result_base' + str(base) + \
                           '_No' + str(queryi) + '.txt', 'w')
             output.write('Target:' + target_data + '\n')
             print(target_data + '\n')
@@ -436,28 +592,21 @@ class LSHAnalysis():
                     output.write(msg + '\n')
                     if test[queryi, :].all() != 0:
                         starttime = time.time()
-                        Atemp = lsh_model.query(test[queryi, :], key, 'euclidean')
+                        self.searchnew(test[queryi, :], key,self.limit,queryi)
+                        # Atemp = lsh_model.query(test[queryi, :], key, 'euclidean')
                         endtime = time.time()
                         Totaltime = Totaltime + endtime - starttime
 
                         for i in range(0,key):
-                            if i < len(Atemp):
+                            if i < len(result_save):
                                 try:
                                     flag_over = 0
-                                    feature_str = str(Atemp[i]).split(')')[0].split('(')[2]
-                                    feature_list = feature_str.split(',')
-                                    feature_array = SelectDB.ListStr2ArrayFloat(feature_list)
-                                    temp = SelectDB.DataAccuray(feature_array)
-                                    str_data = temp.astype(str)
-                                    feature = "-".join(str_data)
-                                    rows = SelectDB.DatafromFeature(feature)
-                                    select_data = self.Row2Str(rows)
+                                    select_data = result_save[i]
                                 except Exception as e:
                                     print(e)
-                                    print(str(Atemp[i]))
                                     select_data = 'null:null#'
                             else:
-                                print('AtempLen:',len(Atemp),' ','key:',key ,'\n')
+                                print('AtempLen:',len(result_save),' ','key:',key ,'\n')
                                 select_data = 'null:null#'
                                 flag_over = 1
                             output.write(select_data + '\n')
@@ -507,15 +656,55 @@ class LSHAnalysis():
         return 0
 
     # 获取当前M的值sour是所有base里的数据，字符串，target是要判断的数据
-    def GetGlobalM(self,func):
-      #  m = 0
-        sql = "select * from test where function_name = " + "'" + func + "'"
-        # 查询记录数
-        # sql = "select * from test where binary_name='busybox_X86_O3'"
+    def GetGlobalM(self,func,sta,num,target):
+        target_str = target.split('#')
+        target_binary = []
+        for data in target_str:
+            if data:
+                bin = data.split(':')[0]
+                target_binary.append(bin)
+        res = []
+        base_cg = []
+        m = 0
+        sql = "select * from " + self.table + " LIMIT " + str(sta) + ',' + str(num)
         self.DODB.cursor.execute(sql)
         rows = self.DODB.cursor.fetchall()
+        for row in rows:
+            if row[1] == func:
+                m = m + 1
+                # 只记录非自身的相同func
+                if row[0] not in target_binary:
+                    row_data = row[0] + ':' + row[1] + '#'
+                    base_cg.append({'binary':row_data,'feature':row[2]})
+            else:
+                pass
+        res.append(m)
+        res.append(base_cg)
+        return res
 
-        return len(rows)
+    # funcnum DICT   funcname LIST   target STR
+    def GetSqlStart(self,funcnum,funcname,target):
+        n = funcname.index(target)
+        sta = 0
+        for i in range(0,n):
+            temp = funcnum[funcname[i]]
+            sta = sta + temp
+        return sta
+
+    def GetFuncListFromFeature(self,featurelist,sta,num):
+        target_list = []
+        # 获取test的所有funcname
+        for queryi in range(len(featurelist)):
+            target = featurelist[queryi, :]
+            print(target)
+            if target.all() != 0:
+                temp_target = self.SelectDB.DataAccuray(target)
+                str_target = temp_target.astype(str)
+                feature_target = "-".join(str_target)
+                rows = self.SelectDB.DatafromFeature(feature_target,sta,num)
+                target_funcname = self.Row2Str(rows)
+                target_list.append(target_funcname)
+        return target_list
 
 
 
@@ -526,21 +715,35 @@ if __name__ == "__main__":
     # DOAnalysis = Date_Analysis()
     # keylist = [i for i in range(1,200)]
 
-    base = 1
+    # s = '0.086363-0.035784-0.022083-0.002909-0.005622-0.004817-0.000327-0.002584-0.000147-0.000138-5.7e-05-0.001568-0.007419-9.4e-05-0.003508'
+    # new_s = s.replace('e-','#')
+    # print(new_s)
+    # exit()
+
+
+    base = 3000
     DOlsh = LSHAnalysis()
-
     DOlsh.Mainfunc(folder+mat_file,base,folder+select_result_folder)
-
+    
+    # func_list = ['v2i_POLICY_MAPPINGS','genrsa_main','priv_decode_gost','prompt_info',\
+    #              'ssl3_get_message']
+    # output = open(folder+select_result_folder + 'funcsearch.txt', 'w')
     # 创建数据库
     # create database YJ_TEST;
     # 查询某条记录
-    # sql = "select * from test where function_name = 'fts3EvalStartReaders'"
-    # 查询记录数
-    # sql = "select * from test where binary_name='busybox_X86_O3'"
-    # DODB.cursor.execute(sql)
-    # rows = DODB.cursor.fetchall()
-    # for row in rows:
-    #     print(row)
+    # for func in func_list:
+    #     sql = "select * from test_new where function_name = " + "'" + func + "'"
+    #     print(sql)
+    #     # 查询记录数
+    #     # sql = "select * from test where binary_name='busybox_X86_O3'"
+    #     DODB.cursor.execute(sql)
+    #     rows = DODB.cursor.fetchall()
+    #     print(func, ':')
+    #     output.write('Target:' + func + '\n')
+    #     for row in rows:
+    #         print(row)
+    #         output.write('search:' + row[0] + ':' + row[2] + '\n')
+    #     print('\n')
 
     # 清空数据库表格
     # DODB.DropTB(DB_INFO['TB'])
