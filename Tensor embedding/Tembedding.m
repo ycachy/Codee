@@ -32,11 +32,11 @@ for i=3:lenn
         [m,n]=size(D);
         %if m>2
          if m<=item
-              %EM(1:m,(index+1))=(D);
-              EM(1:m,k-2)=(D);
+              EM(1:m,(index+1))=(D);
+              %EM(1:m,k-2)=(D);
          else
-              %EM(:,(index+1))=(D(1:item,1));
-              EM(:,k-2)=(D(1:item,1));
+              EM(:,(index+1))=(D(1:item,1));
+              %EM(:,k-2)=(D(1:item,1));
     
          end
         %end
@@ -46,7 +46,7 @@ for i=3:lenn
     X(:,i-2,:)=EM;
 end
 
- kcompress=50; %compress feature
+ kcompress=20; %compress feature
 
 [U,S,V]=tensor_t_svd(X);
 
@@ -84,6 +84,6 @@ disp(num2str(toc))
 
 FFE=double(ones(kcompress,programnumber,number));
 Up=tran(Ucompress);
-CC=tproduct(Up,X);
-save('G:/tsvd/tensor.mat', 'CC');
+FFE=tproduct(Up,X);
+save('G:/tsvd/tensor.mat', 'FFE');
 
