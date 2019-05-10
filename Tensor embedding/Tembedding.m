@@ -32,10 +32,10 @@ for i=3:lenn
         [m,n]=size(D);
         %if m>2
          if m<=item
-              EM(1:m,(index+1))=(D);
+              EM(1:m,(index+1))=abs(D);
               %EM(1:m,k-2)=(D);
          else
-              EM(:,(index+1))=(D(1:item,1));
+              EM(:,(index+1))=abs(D(1:item,1));
               %EM(:,k-2)=(D(1:item,1));
     
          end
