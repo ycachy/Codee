@@ -1,15 +1,15 @@
+import numpy as np
 # !/usr/bin/python3
 import pymysql
 import time
-import numpy as np
 import scipy.io as sio # 重新安装该库
 import random
 import os
 from lshash import LSHash
-DB_INFO = {'host':'127.0.0.1','port':3306,'DB':'YJ_TEST','TB':'test'}
+DB_INFO = {'host':'127.0.0.1','port':3306,'DB':'YJ_TEST','TB':'test_new'}
 folder = 'F:/Study/510/DocYJ/DataBase/'
-mat_file = 'tensor.mat'
-binary_file = 'functionname/binaryname.txt'
+mat_file = 'tensor_new.mat'
+binary_file = 'functionname/binaryname_new.txt'
 result_file = 'result.txt'
 select_result_folder = 'result/'
 
@@ -89,10 +89,6 @@ class Date_Analysis():
         x_max = matrix_shape[0]
         y_max = matrix_shape[1]
         z_max = matrix_shape[2]
-
-        # print(s_data[:,93,1332])
-        # exit()
-
         try:
             binary_handle = open(binary_addr,'r')
             binary_contents = binary_handle.readlines()
@@ -233,6 +229,25 @@ class LSHAnalysis():
         self.SelectDB = Date_Analysis()
         pass
 
+    def searchnew(self,test,model):
+        # testindex=list()
+        i = 0
+        totaly = []
+        #for testi in range(len(test)):
+            #print
+        #test[testi]
+        testindex = list()
+        #y = []
+        for modeli in range(len(model)):
+            dis = np.linalg.norm(np.array(test) - np.array(model[modeli]))
+            testindex.append({'index': modeli, 'dis': dis})
+            #i = i + 1
+        testindex.sort(key=lambda x: x['dis'], reverse=False)
+        for x in testindex[0:20]:
+            totaly.append(x['index'])
+        #totaly.append(y)
+        # print(totaly)
+        return totaly
     # key表示获得相似feature的个数
     def Mainfunc(self,mat_addr,result_folder,binary_file):
         # base数据的所有binary_func_name
@@ -243,13 +258,21 @@ class LSHAnalysis():
         datalen = len(svec)
         n1, n2, n3 = np.shape(svec)
         test_dict = {'core':[0,12],'curl':[48,60],'libgmp':[60,72],'busybox':[72,84],'openssl':[84,96],'sqlite':[96,108]}
-        compareDict = {'core_arm_o0':4,'core_arm_o1':5,'core_arm_o2':6,'core_arm_o3':7,
-                       'curl_arm_o0':52,'curl_arm_o1':53,'curl_arm_o2':54,'curl_arm_o3':55,
-                       'libgmp.so.10.3.2_arm_O0':64,'libgmp.so.10.3.2_arm_O1':65,
-                       'libgmp.so.10.3.2_arm_O2':66,'libgmp.so.10.3.2_arm_O3':67,
-                       'busybox_arm_o0':72,'busybox_arm_o1':73,'busybox_arm_o2':74,'busybox_arm_o3':75,
+        compareDict = {'core_dir_arm_o0':16,'core_dir_arm_o1':17,'core_dir_arm_o2':18,'core_dir_arm_o3':19,
+                       'curl_arm_o0':64,'curl_arm_o1':65,'curl_arm_o2':66,'curl_arm_o3':67,
+                       'curl_mips_o0': 68, 'curl_mips_o1': 69, 'curl_mips_o2': 70, 'curl_mips_o3': 71,
+                       'curl_x86_o0': 60, 'curl_x86_o1': 61, 'curl_x86_o2': 62, 'curl_x86_o3': 63,
+                       'libgmp.so.10.3.2_arm_O0':76,'libgmp.so.10.3.2_arm_O1':77,
+                       'libgmp.so.10.3.2_arm_O2':78,'libgmp.so.10.3.2_arm_O3':79,
+                       'busybox_arm_o0':0,'busybox_arm_o1':1,'busybox_arm_o2':2,'busybox_arm_o3':3,
                        'openssl_arm_o0':84, 'openssl_arm_o1':85,'openssl_arm_o2':86,'openssl_arm_o3':87,
                        'sqlite_arm_o0':96,'sqlite_arm_o1':97, 'sqlite_arm_o2':98,'sqlite_arm_o3':99,
+                       'sqlite_x86_o0': 104, 'sqlite_x86_o1': 105, 'sqlite_x86_o2': 106, 'sqlite_x86_o3': 107,
+                       'sqlite_mips_o0': 100, 'sqlite_mips_o1': 101, 'sqlite_mips_o2': 102, 'sqlite_mips_o3': 103,
+                       'core_dir_mips_o0': 20, 'core_dir_mips_o1': 21, 'core_dir_mips_o2': 22, 'core_dir_mips_o3': 23,
+                       'core_dir_x86_o0': 12, 'core_dir_x86_o1': 13, 'core_dir_x86_o2': 14, 'core_dir_x86_o3': 15,
+                       'openssl_mips_o0': 88, 'openssl_mips_o1': 89, 'openssl_mips_o2': 90, 'openssl_mips_o3': 91,
+                       'openssl_x86_o0': 92, 'openssl_x86_o1': 93, 'openssl_x86_o2': 94, 'openssl_x86_o3': 95,
                        }
         FUNCTIONNUMBER={'coreutils_dir_X86_O0':290,
                         'coreutils_dir_X86_O1':239,
@@ -361,35 +384,27 @@ class LSHAnalysis():
                         'sqlite_x86_o3':1772,
                                                 }
 
-
         FUNCTIONNAME = []
         func_name = open(binary_file,'r')
         func_contents = func_name.readlines()
         for func_content in func_contents:
-            FUNCTIONNAME.append(func_content.split("'")[1])
-
-        # # 确认数据库偏移量
-        # binary_db_num = []
-        # for binary in FUNCTIONNAME:
-        #     sql = "select * from " + self.table + " where binary_name=" + "'" + binary + "'"
-        #     self.DODB.cursor.execute(sql)
-        #     rows = self.DODB.cursor.fetchall()
-        #     binary_db_num.append({binary:len(rows)})
-        # print(binary_db_num)
-        # exit()
+            FUNCTIONNAME.append(func_content.strip("'").strip('\n').split("'")[0])
+        print(FUNCTIONNAME)
 
 
         #core 只针对DIR
-        imodel_name = 'openssl_arm_o3'
-        imodel_BIN_name = 'openssl_arm_o3'
+        imodel_name = 'sqlite_x86_o0'
+        imodel_BIN_name = 'sqlite_x86_o0'
         imodel=compareDict[imodel_name]
         # 输入binanry全称
+
+
         imdel_s = self.GetSqlStart(FUNCTIONNUMBER,FUNCTIONNAME,imodel_BIN_name)
         # 确定数据库范围
         imodel_s_n = [imdel_s,FUNCTIONNUMBER[imodel_BIN_name]]
 
-        itest_name = 'openssl_arm_o0'
-        itest_BIN_name = 'openssl_arm_o0'
+        itest_name = 'sqlite_arm_o0'
+        itest_BIN_name = 'sqlite_arm_o0'
         itest=compareDict[itest_name]
         itest_s = self.GetSqlStart(FUNCTIONNUMBER,FUNCTIONNAME,itest_BIN_name)
         itest_s_n = [itest_s,FUNCTIONNUMBER[itest_BIN_name]]
@@ -424,48 +439,73 @@ class LSHAnalysis():
 
         ##############################################################################
         itest_func_list = self.GetFuncListFromFeature(test,itest_s_n[0],itest_s_n[1])
-        #imodel_func_list = self.GetFuncListFromFeature(model,imodel_s_n[0],imodel_s_n[1])
+        imodel_func_list = self.GetFuncListFromFeature(model,imodel_s_n[0],imodel_s_n[1])
         print('target_list get success\n')
 
-       # Inmodel_Total = self.GetInmodelTotal(imodel_func_list,itest_func_list)
+        Inmodel_Total = self.GetInmodelTotal(imodel_func_list,itest_func_list)
+        # Inmodel_Total = len(itest_func_list)
         Inmodel_NUM = 0.0
-        output = open(result_folder + 'BetweenTestRecored' + '.txt', 'a')
+        output = open(result_folder + 'Between' + '.txt', 'a')
         # SelectDB = Date_Analysis()
         for queryi in range(test_num):
             key = 20
             test_funcname = itest_func_list[queryi]
+            print('Start find func:',test_funcname)
             if test[queryi, :].all() != 0:
-                Atemp = lsh_model.query(test[queryi, :], key, 'euclidean')
-                for i in range(0,key):
-                    if i < len(Atemp):
-                        try:
-                            feature_str = str(Atemp[i]).split(')')[0].split('(')[2]
-                            feature_list = feature_str.split(',')
-                            feature_array = self.SelectDB.ListStr2ArrayFloat(feature_list)
-                            temp = self.SelectDB.DataAccuray(feature_array)
-                            str_data = temp.astype(str)
-                            feature = "-".join(str_data)
-                            rows = self.SelectDB.DatafromFeature(feature,imodel_s_n[0],imodel_s_n[1])
-                            select_funcname = rows[0][1]
-                            if test_funcname.find(select_funcname):
-                                Inmodel_NUM = Inmodel_NUM + 1
-                                print('Get One')
+                #Atemp = lsh_model.query(test[queryi, :], key, 'euclidean')
+                #print(test[queryi,:])
+                Atemp=self.searchnew(test[queryi,:], model)
+                for i in range(len(Atemp)):
+                    #if i < len(Atemp):
+                    try:
+                        # print (Atemp[i])
+                        ## 根据feature反查function
+                        # feature_str = model[int(Atemp[i]),:]
+                        # #feature_list = feature_str.split(',')
+                        # feature_array = self.SelectDB.ListStr2ArrayFloat(feature_str)
+                        # temp = self.SelectDB.DataAccuray(feature_array)
+                        # str_data = temp.astype(str)
+                        # feature = "-".join(str_data)
+                        # rows = self.SelectDB.DatafromFeature(feature,imodel_s_n[0],imodel_s_n[1])
+                        # select_funcname = rows[0][1]
+                        ## 根据下标直接获取function
+                        select_funcname = imodel_func_list[int(Atemp[i])]
+                        lentar = len(select_funcname.split('_'))
+                        issame = False
+                        for ilentar in range(lentar):
+                            tempp = select_funcname.split('_')[ilentar]
+                           # print(tempp)
+                            if test_funcname.find(tempp)!=-1:
+                                issame = True
                                 break
-                            else:
-                                pass
-                        except Exception as e:
-                            print(e)
-                            print(str(Atemp[i]))
-                    else:
-                        print('AtempLen:',len(Atemp),' ','key:',key)
-                        break
-        res = str(float('%.4f' % (Inmodel_NUM/len(itest_func_list))))
+                        #if test_funcname.strip(' ').strip('\n')==select_funcname.strip(' ').strip('\n'):
+                        if issame:
+                            Inmodel_NUM = Inmodel_NUM + 1
+                            print('Get One')
+                            break
+                        else:
+                            pass
+                        # if test_funcname.find(select_funcname)!=-1:
+                        #     Inmodel_NUM = Inmodel_NUM + 1
+                        #     print('Get One')
+                        #     break
+                        # else:
+                        #     # print(test_funcname + ' ! ' + select_funcname)
+                        #     pass
+                    except Exception as e:
+                        print(e)
+                        print(str(Atemp[i]))
+                # else:
+                #     print('AtempLen:',len(Atemp),' ','key:',key)
+                #     continue
+        res = str(float('%.4f' % (Inmodel_NUM/Inmodel_Total)))
         msg = itest_name + '----->' + imodel_name + \
-              ' Res:' + res + ' Inmodel_NUM:' + str(Inmodel_NUM) +\
-            ' Test_NUM:' + str(len(itest_func_list)) #+ ' Model_NUM:' + str(len(imodel_func_list))# ' Inmodel_Total:' + str(Inmodel_Total)# +\
+              ' Res:' + res + ' Inmodel_NUM:' + str(Inmodel_NUM) + ' Inmodel_Total:' + str(Inmodel_Total) +\
+            ' Test_NUM:' + str(len(itest_func_list)) + ' Model_NUM:' + str(len(model))
         output.write(msg + '\n')
         print(msg)
         output.close()
+
 
     def GetInmodelTotal(self,model_func,test_func):
         total = 0
@@ -479,17 +519,14 @@ class LSHAnalysis():
         # 获取test的所有funcname
         for queryi in range(len(featurelist)):
             target = featurelist[queryi, :]
+            print(target)
             if target.all() != 0:
                 temp_target = self.SelectDB.DataAccuray(target)
                 str_target = temp_target.astype(str)
                 feature_target = "-".join(str_target)
                 rows = self.SelectDB.DatafromFeature(feature_target,sta,num)
-                if len(rows):
-                    target_funcname = rows[0][1]
-                    target_list.append(target_funcname)
-                   # print('find record',feature_target, sta, num)
-                # else:
-                    #print('Not find record',feature_target,sta,num)
+                target_funcname = rows[0][1]
+                target_list.append(target_funcname)
         return target_list
 
 
@@ -554,17 +591,17 @@ if __name__ == "__main__":
     # DOAnalysis = Date_Analysis()
     # keylist = [i for i in range(1,200)]
 
-    # base = 3000
-     DOlsh = LSHAnalysis()
-     DOlsh.Mainfunc(folder+mat_file,base,folder+select_result_folder,folder+binary_file)
+    #base = 10
+    DOlsh = LSHAnalysis()
+    DOlsh.Mainfunc(folder+mat_file,folder+select_result_folder,folder+binary_file)
 
 
     # DODB = DB_Actor()
-    
+    # 创建数据库
     # create database YJ_TEST;
-    
+    # 查询某条记录
     # sql = "select * from test where function_name = 'fts3EvalStartReaders'"
-   
+    # 查询记录数
     # sql = "select * from test where binary_name='coreutils_dir_X86_O0'"
     # sql = "select * from test LIMIT 2271,1"
 
@@ -579,26 +616,31 @@ if __name__ == "__main__":
     # rows = DODB.cursor.fetchall()
     # print(len(rows))
 
-   
+    # 清空数据库表格
     # DODB.DropTB(DB_INFO['TB'])
 
-  
-    DOAnalysis.MainAnalysis(folder+binary_file,folder+mat_file,folder)
+    # 数据分析并保存数据库
+    # DOAnalysis.MainAnalysis(folder+binary_file,folder+mat_file,folder)
 
-   
+    # 根据feature查询数据库
     # DOAnalysis.ResultAnalysis(folder+result_file,folder+result_file)
 
-  
+    # str与float转换
     # x = float('0.1234')
     # y = str(x)
     # print(type(x),type(y))
 
- 
+    # array与list转换
     # a = list()
     # b = np.array(a)
     # c = b.tolist()
 
 
+    # 展示数据库数据
     # DODB.ShowDB(DB_INFO['TB'])
 
+    # 断开数据库连接
     # DODB.CutLink()
+
+
+
