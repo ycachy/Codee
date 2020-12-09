@@ -10,7 +10,7 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import matching_driver
 import featureGen
 import preprocessing
-from deepwalk import deepwalk
+import deepwalk
 
 import tensorflow as tf
 import numpy as np
