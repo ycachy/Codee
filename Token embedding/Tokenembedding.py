@@ -367,7 +367,7 @@ def caculate_roc_for_function_match_blockEmbedding(matched_pairs, funcNameBlockL
         for epoch in range(epochs):
             inputs_func_list, label_func_list = gen_match_inputs_blockEmbedding(funcNameBlockListMappingBin1, funcNameBlockListMappingBin2)
 
-            stat_for_roc_list = [0, 0, 0, 0]  # 统计信息
+            stat_for_roc_list = [0, 0, 0, 0]  
             for i in range(len(inputs_func_list)):
                 func1Name = inputs_func_list[i]
                 func2Name = label_func_list[i]
@@ -391,9 +391,9 @@ def caculate_roc_for_function_match_blockEmbedding(matched_pairs, funcNameBlockL
                         if bid2 in blockList2:
                             matched_block_count += 1
                 f.write("\n"+str(matched_block_count)+"\n")
-                actual_Positive = False  # 实际值 两个函数是否同名
-                predict_Positive = False  # 预测值 两个函数是否匹配
-                if matched_block_count >= threshold_min_block_count:  # 匹配数量大于等于阈值规定的
+                actual_Positive = False  
+                predict_Positive = False  
+                if matched_block_count >= threshold_min_block_count:  
                     predict_Positive = True
                     if func1Name == func2Name:
                         match_same_name += 1
@@ -933,7 +933,6 @@ def main_DeepbinDiff_FuncPair_ROC():
         bb_matching_pair_replace.append((bid1, bid2))
     matched_pairs.extend(bb_matching_pair_replace)
 
-    # 生成两个list，再将两个list送入函数。
     inputs_func_list, lable_func_list, block_match_Dict = gen_match_inputs(
         matched_pairs, funcIndexMappingBin1, funcIndexMappingBin2,
         blockListOfFuncBin1, blockListOfFuncBin2)
